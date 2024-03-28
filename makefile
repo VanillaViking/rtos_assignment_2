@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Werror -g
+CFLAGS = -Wall -g
 
 all: 
-	$(CC) $(CFLAGS) -o assign2.o  assign2_template-v4.c  
+	$(CC) $(CFLAGS) -o assign2  assign2_template-v4.c  

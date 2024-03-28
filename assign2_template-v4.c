@@ -24,6 +24,7 @@
 #include  <sys/stat.h>
 #include  <semaphore.h>
 #include  <sys/time.h>
+#include <sys/mman.h>
 
 /* to be used for your memory allocation, write/read. man mmsp */
 #define SHARED_MEM_NAME "/my_shared_memory"
@@ -59,8 +60,22 @@ void* ThreadB(void *params);
 /* This thread reads from shared variable and outputs non-header text to src.txt */
 void* ThreadC(void *params);
 
+/* Read contents of specified file pointer */
+int read_file(char filename[]);
+
 /* --- Main Code --- */
 int main(int argc, char const *argv[]) {
+
+  char file_name[100];
+
+  /* Verify the correct number of arguments were passed in */
+  if (argc != 3) {
+    fprintf(stderr, "USAGE:./assign2 data.txt output.txt\n");
+  }
+
+  strcpy(file_name, argv[1]); //copy a string from the commond line
+  
+  read_file(file_name);
   
  pthread_t tid[3]; // three threads
  ThreadParams params;
@@ -70,12 +85,16 @@ int main(int argc, char const *argv[]) {
 
   // Create Threads
   pthread_create(&(tid[0]), &attr, &ThreadA, (void*)(&params));
+  pthread_create(&(tid[1]), &attr, &ThreadB, (void*)(&params));
+  pthread_create(&(tid[2]), &attr, &ThreadC, (void*)(&params));
 
   //TODO: add your code
  
 
   // Wait on threads to finish
   pthread_join(tid[0], NULL);
+  pthread_join(tid[1], NULL);
+  pthread_join(tid[2], NULL);
   
     
   //TODO: add your code
@@ -85,11 +104,11 @@ int main(int argc, char const *argv[]) {
 
 void initializeData(ThreadParams *params) {
   // Initialize Sempahores
-  if(sem_init(&(params->sem_A), 0, 1) != 0) { // Set up Sem for thread A
+  if(sem_init(&(params->sem_A), 0, 0) != 0) { // Set up Sem for thread A
     perror("error for init threa A");
     exit(1);
   }
-if(sem_init(&(params->sem_B), 0, 0) != 0) { // Set up Sem for thread B
+if(sem_init(&(params->sem_B), 0, 1) != 0) { // Set up Sem for thread B
     perror("error for init threa B");
     exit(1);
   }
@@ -112,7 +131,15 @@ printf("Thread A: sum = %d\n", sum);
 }
 
 void* ThreadB(void *params) {
-  //TODO: add your code
+  
+  //TODO: change to read from pipe
+  char temp_str[1024];
+
+  shm_fd = shm_open(SHARED_MEM_NAME, O_CREAT|O_RDWR, 0666);
+  ftruncate(shm_fd, SHARED_MEM_SIZE);
+  void* shm_ptr = mmap(0, SHARED_MEM_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  
+  sprintf(shm_ptr, "%s", temp_str);
 
   printf("Thread B: sum = %d\n", sum);
 }
@@ -121,4 +148,26 @@ void* ThreadC(void *params) {
   //TODO: add your code
 
  printf("Thread C: Final sum = %d\n", sum);
+}
+
+// temporary read function
+int read_file(char file_name[]) {
+  char c[1000];
+  int sig;
+  FILE* fptr;
+  char check[1000]="end_header";
+  if ((fptr = fopen(file_name, "r")) == NULL) {
+    printf("Error! opening file");
+    // Program exits if file pointer returns NULL.
+    exit(1);
+  }
+
+  // reads text until newline is encountered
+  printf("reading from the file:\n");
+  sig=0;
+  while(fgets(c, sizeof(c), fptr) != NULL) {
+    fputs(c, stdout);
+  }
+  fclose(fptr);
+  return 0;
 }
