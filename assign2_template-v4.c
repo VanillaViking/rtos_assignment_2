@@ -8,11 +8,11 @@
 /***********************************************************************************/
 
 /*
-  To compile assign2_template-v3.c ensure that gcc is installed and run 
-  the following command:
+   To compile assign2_template-v3.c ensure that gcc is installed and run 
+   the following command:
 
-  gcc your_program.c -o your_ass-2 -lpthread -lrt -Wall
-*/
+   gcc your_program.c -o your_ass-2 -lpthread -lrt -Wall
+   */
 
 #include  <pthread.h>
 #include  <stdlib.h>
@@ -66,17 +66,17 @@ int read_file(char filename[], void* shm_ptr);
 /* --- Main Code --- */
 int main(int argc, char const *argv[]) {
 
-  
+
   /* Verify the correct number of arguments were passed in */
   if (argc != 3) {
     fprintf(stderr, "USAGE:./assign2 data.txt output.txt\n");
     exit(1);
   }
-  
- pthread_t tid[3]; // three threads
- ThreadParams params;
 
-  
+  pthread_t tid[3]; // three threads
+  ThreadParams params;
+
+
   // Initialization
   initializeData(&params);
   strcpy(params.inputFile, argv[1]); 
@@ -88,14 +88,14 @@ int main(int argc, char const *argv[]) {
   pthread_create(&(tid[2]), &attr, &ThreadC, (void*)(&params));
 
   //TODO: add your code
- 
+
 
   // Wait on threads to finish
   pthread_join(tid[0], NULL);
   pthread_join(tid[1], NULL);
   pthread_join(tid[2], NULL);
-  
-    
+
+
   //TODO: add your code
 
   return 0;
@@ -107,7 +107,7 @@ void initializeData(ThreadParams *params) {
     perror("error for init threa A");
     exit(1);
   }
-if(sem_init(&(params->sem_B), 0, 0) != 0) { // Set up Sem for thread B
+  if(sem_init(&(params->sem_B), 0, 0) != 0) { // Set up Sem for thread B
     perror("error for init threa B");
     exit(1);
   }
@@ -116,7 +116,7 @@ if(sem_init(&(params->sem_B), 0, 0) != 0) { // Set up Sem for thread B
     exit(1);
   } 
 
-// Initialize thread attributes 
+  // Initialize thread attributes 
   pthread_attr_init(&attr);
   //TODO: add your code
 
@@ -126,8 +126,8 @@ if(sem_init(&(params->sem_B), 0, 0) != 0) { // Set up Sem for thread B
 void* ThreadA(void *params) {
   //TODO: add your code
   sem_wait(&((ThreadParams*)params)->sem_A);
-  
-printf("Thread A: sum = %d\n", sum);
+
+  printf("Thread A: sum = %d\n", sum);
 
   sem_post(&((ThreadParams*)params)->sem_B);
 }
@@ -143,7 +143,7 @@ void* ThreadB(void *params) {
   void* shm_ptr = mmap(0, SHARED_MEM_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
   read_file(((ThreadParams*)params)->inputFile, shm_ptr);
-  
+
   for (int i = 0; i < 3; i++) {
     sum = sum * 3;
   }
@@ -154,15 +154,13 @@ void* ThreadB(void *params) {
 
 void* ThreadC(void *params) {
   sem_wait(&((ThreadParams*)params)->sem_C);
-
   FILE* output_file_ptr;
   shm_fd = shm_open(SHARED_MEM_NAME, O_RDONLY, 0666);
   ftruncate(shm_fd, SHARED_MEM_SIZE);
   void* shm_ptr = mmap(0, SHARED_MEM_SIZE, PROT_READ, MAP_SHARED, shm_fd, 0);
   char shm_contents[SHARED_MEM_SIZE];
-
   strcpy(shm_contents, (char*)shm_ptr);
-  
+
   remove(((ThreadParams*)params)->outputFile);
   if ((output_file_ptr = fopen(((ThreadParams*)params)->outputFile, "a")) == NULL) {
     printf("Error opening output file");
@@ -172,16 +170,12 @@ void* ThreadC(void *params) {
   char* line = strtok(shm_contents, "\n");
   int is_header = 1; 
   while (line != NULL) {
-
     if (is_header == 0) {
-      // TODO: write line to output file 
       fprintf(output_file_ptr, "%s\n", line);
     }
-
     if (strcmp(line, "end_header") == 0) {
       is_header = 0;
     }
-
     line = strtok(NULL, "\n");
   }
 
@@ -189,8 +183,8 @@ void* ThreadC(void *params) {
   for (int i = 0; i < 4; i++) {
     sum = sum - 5;
   }
-  
- printf("Thread C: Final sum = %d\n", sum);
+
+  printf("Thread C: Final sum = %d\n", sum);
 }
 
 // temporary read function
