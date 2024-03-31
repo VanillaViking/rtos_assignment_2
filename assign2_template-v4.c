@@ -61,27 +61,26 @@ void* ThreadB(void *params);
 void* ThreadC(void *params);
 
 /* Read contents of specified file pointer */
-int read_file(char filename[]);
+int read_file(char filename[], void* shm_ptr);
 
 /* --- Main Code --- */
 int main(int argc, char const *argv[]) {
 
-  char file_name[100];
-
+  
   /* Verify the correct number of arguments were passed in */
   if (argc != 3) {
     fprintf(stderr, "USAGE:./assign2 data.txt output.txt\n");
+    exit(1);
   }
-
-  strcpy(file_name, argv[1]); //copy a string from the commond line
-  
-  read_file(file_name);
   
  pthread_t tid[3]; // three threads
  ThreadParams params;
+
   
   // Initialization
   initializeData(&params);
+  strcpy(params.inputFile, argv[1]); 
+  strcpy(params.outputFile, argv[2]); 
 
   // Create Threads
   pthread_create(&(tid[0]), &attr, &ThreadA, (void*)(&params));
@@ -104,11 +103,11 @@ int main(int argc, char const *argv[]) {
 
 void initializeData(ThreadParams *params) {
   // Initialize Sempahores
-  if(sem_init(&(params->sem_A), 0, 0) != 0) { // Set up Sem for thread A
+  if(sem_init(&(params->sem_A), 0, 1) != 0) { // Set up Sem for thread A
     perror("error for init threa A");
     exit(1);
   }
-if(sem_init(&(params->sem_B), 0, 1) != 0) { // Set up Sem for thread B
+if(sem_init(&(params->sem_B), 0, 0) != 0) { // Set up Sem for thread B
     perror("error for init threa B");
     exit(1);
   }
@@ -126,32 +125,76 @@ if(sem_init(&(params->sem_B), 0, 1) != 0) { // Set up Sem for thread B
 
 void* ThreadA(void *params) {
   //TODO: add your code
+  sem_wait(&((ThreadParams*)params)->sem_A);
   
 printf("Thread A: sum = %d\n", sum);
+
+  sem_post(&((ThreadParams*)params)->sem_B);
 }
 
 void* ThreadB(void *params) {
-  
+  sem_wait(&((ThreadParams*)params)->sem_B);
+
   //TODO: change to read from pipe
   char temp_str[1024];
 
   shm_fd = shm_open(SHARED_MEM_NAME, O_CREAT|O_RDWR, 0666);
   ftruncate(shm_fd, SHARED_MEM_SIZE);
   void* shm_ptr = mmap(0, SHARED_MEM_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0);
+
+  read_file(((ThreadParams*)params)->inputFile, shm_ptr);
   
-  sprintf(shm_ptr, "%s", temp_str);
+  for (int i = 0; i < 3; i++) {
+    sum = sum * 3;
+  }
 
   printf("Thread B: sum = %d\n", sum);
+  sem_post(&((ThreadParams*)params)->sem_C);
 }
 
 void* ThreadC(void *params) {
-  //TODO: add your code
+  sem_wait(&((ThreadParams*)params)->sem_C);
 
+  FILE* output_file_ptr;
+  shm_fd = shm_open(SHARED_MEM_NAME, O_RDONLY, 0666);
+  ftruncate(shm_fd, SHARED_MEM_SIZE);
+  void* shm_ptr = mmap(0, SHARED_MEM_SIZE, PROT_READ, MAP_SHARED, shm_fd, 0);
+  char shm_contents[SHARED_MEM_SIZE];
+
+  strcpy(shm_contents, (char*)shm_ptr);
+  
+  remove(((ThreadParams*)params)->outputFile);
+  if ((output_file_ptr = fopen(((ThreadParams*)params)->outputFile, "a")) == NULL) {
+    printf("Error opening output file");
+    exit(1);
+  }
+
+  char* line = strtok(shm_contents, "\n");
+  int is_header = 1; 
+  while (line != NULL) {
+
+    if (is_header == 0) {
+      // TODO: write line to output file 
+      fprintf(output_file_ptr, "%s\n", line);
+    }
+
+    if (strcmp(line, "end_header") == 0) {
+      is_header = 0;
+    }
+
+    line = strtok(NULL, "\n");
+  }
+
+  // Calculate sum variable
+  for (int i = 0; i < 4; i++) {
+    sum = sum - 5;
+  }
+  
  printf("Thread C: Final sum = %d\n", sum);
 }
 
 // temporary read function
-int read_file(char file_name[]) {
+int read_file(char file_name[], void* shm_ptr) {
   char c[1000];
   int sig;
   FILE* fptr;
@@ -163,10 +206,13 @@ int read_file(char file_name[]) {
   }
 
   // reads text until newline is encountered
-  printf("reading from the file:\n");
   sig=0;
   while(fgets(c, sizeof(c), fptr) != NULL) {
-    fputs(c, stdout);
+    if (sprintf(shm_ptr, "%s", c) < 0) {
+      printf("Error writing to shared memory");
+      exit(1);
+    }
+    shm_ptr += strlen(c); // increase the pointer of address for writing the next line
   }
   fclose(fptr);
   return 0;
