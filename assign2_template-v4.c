@@ -14,6 +14,8 @@
    gcc your_program.c -o your_ass-2 -lpthread -lrt -Wall
    */
 
+/* make assign2 data.txt output.txt */
+
 #include  <pthread.h>
 #include  <stdlib.h>
 #include  <unistd.h>
@@ -124,12 +126,37 @@ void initializeData(ThreadParams *params) {
 }
 
 void* ThreadA(void *params) {
-  //TODO: add your code
+
   sem_wait(&((ThreadParams*)params)->sem_A);
+  
+  char c[1000];
+  int sig;
+  FILE* file;
+  char* input = ((ThreadParams*)params)->inputFile;
+  int* pipe = ((ThreadParams*)params)->pipeFile;
+
+  file = fopen("data.txt", "r");
+
+  if (file == NULL) {
+    printf("Error! opening file");
+    // return null if threres no file 
+    exit(1);
+  }
+  
+  // reads all lines from data.txt
+  while (fgets(input, sizeof(input), file) != NULL) {
+    write(pipe[1], input, sizeof(input)); 
+    printf("Success");
+  }
+  
+  if (pipe[1] == -1) {
+    perror("pipe error");
+  } 
 
   printf("Thread A: sum = %d\n", sum);
 
   sem_post(&((ThreadParams*)params)->sem_B);
+
 }
 
 void* ThreadB(void *params) {
@@ -187,8 +214,8 @@ void* ThreadC(void *params) {
   printf("Thread C: Final sum = %d\n", sum);
 }
 
-// temporary read function
-int read_file(char file_name[], void* shm_ptr) {
+
+int read_file(char file_name[], void* shm_ptr) { /*
   char c[1000];
   int sig;
   FILE* fptr;
@@ -209,5 +236,5 @@ int read_file(char file_name[], void* shm_ptr) {
     shm_ptr += strlen(c); // increase the pointer of address for writing the next line
   }
   fclose(fptr);
-  return 0;
+  return 0; */
 }
