@@ -153,6 +153,10 @@ void* ThreadA(void *params) {
     perror("pipe error");
   } 
 
+  for (int i = 0; i < 5; i++) { 
+    sum = 2 * sum; 
+  }
+
   printf("Thread A: sum = %d\n", sum);
 
   sem_post(&((ThreadParams*)params)->sem_B);
