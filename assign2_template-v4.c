@@ -118,9 +118,14 @@ void initializeData(ThreadParams *params) {
     exit(1);
   } 
 
+  int result = pipe(params->pipeFile);
+  if (result < 0){
+    perror("pipe error");
+    exit(1);
+  }
+
   // Initialize thread attributes 
   pthread_attr_init(&attr);
-  //TODO: add your code
 
   return;
 }
@@ -129,24 +134,22 @@ void* ThreadA(void *params) {
 
   sem_wait(&((ThreadParams*)params)->sem_A);
   
-  char c[1000];
+  char buf[1000];
   int sig;
   FILE* file;
   char* input = ((ThreadParams*)params)->inputFile;
   int* pipe = ((ThreadParams*)params)->pipeFile;
 
-  file = fopen("data.txt", "r");
-
-  if (file == NULL) {
+  if ((file = fopen(input, "r")) == NULL) {
     printf("Error! opening file");
-    // return null if threres no file 
+    // Program exits if file pointer returns NULL.
     exit(1);
   }
-  
+
   // reads all lines from data.txt
-  while (fgets(input, sizeof(input), file) != NULL) {
-    write(pipe[1], input, sizeof(input)); 
-    printf("Success");
+  char* str_read;
+  while ((str_read = fgets(buf, sizeof(buf), file)) != NULL) {
+    write(pipe[1], buf, strlen(str_read)); 
   }
   
   if (pipe[1] == -1) {
@@ -166,14 +169,24 @@ void* ThreadA(void *params) {
 void* ThreadB(void *params) {
   sem_wait(&((ThreadParams*)params)->sem_B);
 
-  //TODO: change to read from pipe
-  char temp_str[1024];
-
+  int* pipe = ((ThreadParams*)params)->pipeFile;
   shm_fd = shm_open(SHARED_MEM_NAME, O_CREAT|O_RDWR, 0666);
   ftruncate(shm_fd, SHARED_MEM_SIZE);
   void* shm_ptr = mmap(0, SHARED_MEM_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
-  read_file(((ThreadParams*)params)->inputFile, shm_ptr);
+  
+  char buf[SHARED_MEM_SIZE];
+
+  int result = read(pipe[0], buf, SHARED_MEM_SIZE);
+  if (result == -1)  {
+    printf("Error reading from pipe");
+    exit(1);
+  }
+
+  if (sprintf(shm_ptr, "%s", buf) < 0) {
+    printf("Error writing to shared memory");
+    exit(1);
+  }
 
   for (int i = 0; i < 3; i++) {
     sum = sum * 3;
@@ -219,7 +232,7 @@ void* ThreadC(void *params) {
 }
 
 
-int read_file(char file_name[], void* shm_ptr) { /*
+int read_file(char file_name[], void* shm_ptr) { 
   char c[1000];
   int sig;
   FILE* fptr;
@@ -240,5 +253,5 @@ int read_file(char file_name[], void* shm_ptr) { /*
     shm_ptr += strlen(c); // increase the pointer of address for writing the next line
   }
   fclose(fptr);
-  return 0; */
+  return 0; 
 }
