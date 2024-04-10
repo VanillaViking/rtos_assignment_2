@@ -89,16 +89,11 @@ int main(int argc, char const *argv[]) {
   pthread_create(&(tid[1]), &attr, &ThreadB, (void*)(&params));
   pthread_create(&(tid[2]), &attr, &ThreadC, (void*)(&params));
 
-  //TODO: add your code
-
 
   // Wait on threads to finish
   pthread_join(tid[0], NULL);
   pthread_join(tid[1], NULL);
   pthread_join(tid[2], NULL);
-
-
-  //TODO: add your code
 
   return 0;
 }
@@ -117,7 +112,8 @@ void initializeData(ThreadParams *params) {
     perror("error for init threa C");
     exit(1);
   } 
-
+  
+  // initialize pipe
   int result = pipe(params->pipeFile);
   if (result < 0){
     perror("pipe error");
@@ -135,7 +131,6 @@ void* ThreadA(void *params) {
   sem_wait(&((ThreadParams*)params)->sem_A);
   
   char buf[1000];
-  int sig;
   FILE* file;
   char* input = ((ThreadParams*)params)->inputFile;
   int* pipe = ((ThreadParams*)params)->pipeFile;
@@ -173,8 +168,8 @@ void* ThreadB(void *params) {
   shm_fd = shm_open(SHARED_MEM_NAME, O_CREAT|O_RDWR, 0666);
   ftruncate(shm_fd, SHARED_MEM_SIZE);
   void* shm_ptr = mmap(0, SHARED_MEM_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0);
-
   
+  // the contents of the pipe will be copied to this buffer
   char buf[SHARED_MEM_SIZE];
 
   int result = read(pipe[0], buf, SHARED_MEM_SIZE);
@@ -198,6 +193,7 @@ void* ThreadB(void *params) {
 
 void* ThreadC(void *params) {
   sem_wait(&((ThreadParams*)params)->sem_C);
+
   FILE* output_file_ptr;
   shm_fd = shm_open(SHARED_MEM_NAME, O_RDONLY, 0666);
   ftruncate(shm_fd, SHARED_MEM_SIZE);
@@ -210,7 +206,8 @@ void* ThreadC(void *params) {
     printf("Error opening output file");
     exit(1);
   }
-
+  
+  // split the string into lines and iterate through each line checking wether the end_header flag has passed
   char* line = strtok(shm_contents, "\n");
   int is_header = 1; 
   while (line != NULL) {
@@ -232,26 +229,3 @@ void* ThreadC(void *params) {
 }
 
 
-int read_file(char file_name[], void* shm_ptr) { 
-  char c[1000];
-  int sig;
-  FILE* fptr;
-  char check[1000]="end_header";
-  if ((fptr = fopen(file_name, "r")) == NULL) {
-    printf("Error! opening file");
-    // Program exits if file pointer returns NULL.
-    exit(1);
-  }
-
-  // reads text until newline is encountered
-  sig=0;
-  while(fgets(c, sizeof(c), fptr) != NULL) {
-    if (sprintf(shm_ptr, "%s", c) < 0) {
-      printf("Error writing to shared memory");
-      exit(1);
-    }
-    shm_ptr += strlen(c); // increase the pointer of address for writing the next line
-  }
-  fclose(fptr);
-  return 0; 
-}
