@@ -144,7 +144,11 @@ void* ThreadA(void *params) {
   // reads all lines from data.txt
   char* str_read;
   while ((str_read = fgets(buf, sizeof(buf), file)) != NULL) {
-    write(pipe[1], buf, strlen(str_read)); 
+    int write_result = write(pipe[1], buf, strlen(str_read)); 
+    if (write_result < 0) {
+      printf("error writing to pipe.");
+      exit(1);
+    }
   }
   
   if (pipe[1] == -1) {
@@ -159,6 +163,7 @@ void* ThreadA(void *params) {
 
   sem_post(&((ThreadParams*)params)->sem_B);
 
+  return NULL;
 }
 
 void* ThreadB(void *params) {
@@ -166,7 +171,11 @@ void* ThreadB(void *params) {
 
   int* pipe = ((ThreadParams*)params)->pipeFile;
   shm_fd = shm_open(SHARED_MEM_NAME, O_CREAT|O_RDWR, 0666);
-  ftruncate(shm_fd, SHARED_MEM_SIZE);
+  int ftrunc_return = ftruncate(shm_fd, SHARED_MEM_SIZE);
+  if (ftrunc_return < 0)  {
+    printf("error occured");
+    exit(1);
+  }
   void* shm_ptr = mmap(0, SHARED_MEM_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0);
   
   // the contents of the pipe will be copied to this buffer
@@ -189,6 +198,8 @@ void* ThreadB(void *params) {
 
   printf("Thread B: sum = %d\n", sum);
   sem_post(&((ThreadParams*)params)->sem_C);
+
+  return NULL;
 }
 
 void* ThreadC(void *params) {
@@ -196,10 +207,10 @@ void* ThreadC(void *params) {
 
   FILE* output_file_ptr;
   shm_fd = shm_open(SHARED_MEM_NAME, O_RDONLY, 0666);
-  ftruncate(shm_fd, SHARED_MEM_SIZE);
   void* shm_ptr = mmap(0, SHARED_MEM_SIZE, PROT_READ, MAP_SHARED, shm_fd, 0);
   char shm_contents[SHARED_MEM_SIZE];
   strcpy(shm_contents, (char*)shm_ptr);
+
 
   remove(((ThreadParams*)params)->outputFile);
   if ((output_file_ptr = fopen(((ThreadParams*)params)->outputFile, "a")) == NULL) {
@@ -213,6 +224,7 @@ void* ThreadC(void *params) {
   while (line != NULL) {
     if (is_header == 0) {
       fprintf(output_file_ptr, "%s\n", line);
+      printf("%s\n", line);
     }
     if (strcmp(line, "end_header") == 0) {
       is_header = 0;
@@ -220,12 +232,16 @@ void* ThreadC(void *params) {
     line = strtok(NULL, "\n");
   }
 
+  shm_unlink(SHARED_MEM_NAME);
+
   // Calculate sum variable
   for (int i = 0; i < 4; i++) {
     sum = sum - 5;
   }
 
-  printf("Thread C: Final sum = %d\n", sum);
+  printf("Thread C: Final sum = %d", sum);
+
+  return NULL;
 }
 
 
